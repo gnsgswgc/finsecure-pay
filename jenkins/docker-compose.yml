@@ -1,0 +1,23 @@
+# Local Jenkins for the capstone.
+# Start:  docker compose -f jenkins/docker-compose.yml up -d --build
+# Open:   http://localhost:8090
+# Stop:   docker compose -f jenkins/docker-compose.yml down   (jobs and credentials are kept)
+services:
+  jenkins:
+    build: .
+    image: finsecure-jenkins:local
+    container_name: finsecure-jenkins
+    # Root is needed to use Docker Desktop's socket. Acceptable for a local
+    # capstone controller; a production setup would use dedicated build agents.
+    user: root
+    ports:
+      - "8090:8080"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ=Asia/Singapore
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:

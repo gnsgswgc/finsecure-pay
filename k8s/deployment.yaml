@@ -48,9 +48,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: finsecure-config
-          env:
-            - name: APP_VERSION
-              value: "1.0.0"
           resources:
             requests:
               cpu: 100m
