@@ -1,0 +1,22 @@
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Secrets and credentials - never commit
+.env
+*.env
+*.pem
+*.key
+*.p12
+*.jks
+kubeconfig*
+secrets.yaml
+*-secret.yaml
+
+# Logs
+*.log
