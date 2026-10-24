@@ -37,7 +37,7 @@ class TransactionValidatorTest {
     void validTransactionIsApproved() {
         var result = validator.validate(txn("T1", "250.00", "SGD", VALID_CARD, "M001"));
 
-        assertThat(result.status()).isEqualTo(Status.REJECTED);
+        assertThat(result.status()).isEqualTo(Status.APPROVED);
         assertThat(result.reasons()).isEmpty();
     }
 
