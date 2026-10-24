@@ -1,0 +1,14 @@
+# Non-secret settings. Spring Boot maps these env vars onto application.yml
+# (e.g. FINSECURE_VALIDATION_MAXAMOUNT -> finsecure.validation.max-amount).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finsecure-config
+  namespace: finsecure
+  labels:
+    app: finsecure
+data:
+  FINSECURE_VALIDATION_MAXAMOUNT: "10000"
+  FINSECURE_VALIDATION_ALLOWEDCURRENCIES: "SGD,USD,EUR"
+  LOGGING_LEVEL_COM_FINSECURE: "INFO"
+  JAVA_OPTS: "-XX:MaxRAMPercentage=75.0"

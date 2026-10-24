@@ -1,0 +1,39 @@
+# EKS cluster for FinSecure Pay.
+# Create:  eksctl create cluster -f infra/eks-cluster.yaml   (~15-20 min)
+# Delete:  eksctl delete cluster -f infra/eks-cluster.yaml   (stops all charges)
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: finsecure-eks
+  region: ap-southeast-1
+  version: "1.36"
+  tags:
+    project: finsecure-pay
+    purpose: capstone
+
+iam:
+  withOIDC: true
+
+managedNodeGroups:
+  - name: workers
+    # t3.small is Free-plan eligible; 2 nodes give 2 replicas on separate nodes
+    instanceType: t3.small
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 3
+    volumeSize: 20
+    labels:
+      role: workers
+    tags:
+      project: finsecure-pay
+
+addons:
+  - name: vpc-cni
+  - name: coredns
+  - name: kube-proxy
+  - name: metrics-server
+
+cloudWatch:
+  clusterLogging:
+    enableTypes: []
