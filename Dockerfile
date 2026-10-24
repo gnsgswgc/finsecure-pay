@@ -19,8 +19,10 @@ WORKDIR /app
 ARG APP_VERSION=1.0.0
 ENV APP_VERSION=${APP_VERSION}
 
-# Run as a non-root user
-RUN addgroup -S finsecure && adduser -S finsecure -G finsecure
+# Apply OS security patches released after the base image was built,
+# then run as a non-root user
+RUN apk upgrade --no-cache \
+ && addgroup -S finsecure && adduser -S finsecure -G finsecure
 COPY --from=build --chown=finsecure:finsecure /app/target/finsecure-pay.jar app.jar
 USER finsecure
 
