@@ -1,6 +1,8 @@
 // FinSecure Pay CI/CD pipeline
-// Checkout -> Build -> Test -> Package -> Container Build -> Push -> Deploy -> Smoke Test
-// Any failing stage stops the pipeline, so a failed test never reaches Push or Deploy.
+// Checkout -> Build -> Test -> Package -> Security Checks -> Container Build -> Image Scan
+//   -> Push -> Deploy -> Smoke Test
+// Any failing stage stops the pipeline, so a failed test or a HIGH/CRITICAL
+// vulnerability never reaches Push or Deploy.
 
 pipeline {
     agent any
@@ -27,6 +29,11 @@ pipeline {
         KUBECONFIG  = "${WORKSPACE}/.kube/config"
         // Keep downloaded Maven libraries between builds
         MAVEN_REPO  = '/var/jenkins_home/.m2/repository'
+        // Trivy runs as a container that shares Jenkins' volumes, so it can
+        // read the workspace and the Docker socket
+        TRIVY       = 'docker run --rm --volumes-from finsecure-jenkins -v trivy-cache:/root/.cache aquasec/trivy:0.69.3'
+        // Security gate: block on HIGH/CRITICAL issues that have a fix available
+        TRIVY_GATE  = '--scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --format table'
     }
 
     stages {
@@ -61,13 +68,65 @@ pipeline {
             }
         }
 
+        stage('Security Checks') {
+            parallel {
+                stage('Code Quality (SonarQube Cloud)') {
+                    steps {
+                        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                            // qualitygate.wait makes the build fail if the Quality Gate fails
+                            sh '''
+                                ./mvnw -B -Dmaven.repo.local=$MAVEN_REPO sonar:sonar \
+                                  -Dsonar.token=$SONAR_TOKEN \
+                                  -Dsonar.projectVersion=$VERSION \
+                                  -Dsonar.qualitygate.wait=true \
+                                  -Dsonar.qualitygate.timeout=300
+                            '''
+                        }
+                    }
+                }
+                stage('Dependency Scan (Trivy)') {
+                    steps {
+                        // Scans every library packaged in the jar against known CVEs
+                        sh '''
+                            mkdir -p reports
+                            set +e
+                            $TRIVY rootfs $TRIVY_GATE --ignorefile $WORKSPACE/.trivyignore \
+                              --output $WORKSPACE/reports/trivy-dependencies.txt \
+                              $WORKSPACE/target/finsecure-pay.jar
+                            RC=$?
+                            cat reports/trivy-dependencies.txt
+                            [ $RC -ne 0 ] && echo "SECURITY GATE: HIGH/CRITICAL vulnerable dependencies found - release blocked"
+                            exit $RC
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Container Build') {
             steps {
                 // EKS nodes are amd64; Docker Desktop cross-builds on Apple Silicon
                 sh '''
-                    docker build --platform linux/amd64 \
+                    docker build --pull --platform linux/amd64 \
                       --build-arg APP_VERSION=$VERSION \
                       -t $IMAGE:$VERSION .
+                '''
+            }
+        }
+
+        stage('Image Scan (Trivy)') {
+            steps {
+                // Scans OS packages and libraries in the final image before it is pushed
+                sh '''
+                    mkdir -p reports
+                    set +e
+                    $TRIVY image $TRIVY_GATE --ignorefile $WORKSPACE/.trivyignore \
+                      --output $WORKSPACE/reports/trivy-image.txt \
+                      $IMAGE:$VERSION
+                    RC=$?
+                    cat reports/trivy-image.txt
+                    [ $RC -ne 0 ] && echo "SECURITY GATE: HIGH/CRITICAL vulnerabilities in image - release blocked"
+                    exit $RC
                 '''
             }
         }
@@ -146,6 +205,7 @@ pipeline {
             echo "Pipeline failed - nothing after the failed stage was run"
         }
         always {
+            archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
             sh 'docker image rm $IMAGE:$VERSION >/dev/null 2>&1 || true'
             sh 'rm -rf $WORKSPACE/.kube'
         }

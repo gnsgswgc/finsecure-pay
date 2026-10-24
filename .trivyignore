@@ -1,0 +1,12 @@
+# Accepted risks for the Trivy security gate.
+# Every entry needs a reason and an expiry date; after expiry the gate blocks again.
+
+# spring-webmvc 6.2.x: RCE via path handling in XsltView.
+# Fixed only in Spring Framework 7 (Spring Boot 4). This app does not use XsltView
+# or any server-side view rendering (JSON REST API only).
+# Action: upgrade to Spring Boot 4 before expiry.
+CVE-2026-47884 exp:2026-12-31
+
+# spring-webmvc 6.2.x: stream corruption in Server-Sent Events with view rendering.
+# Fixed only in Spring Framework 7. This app does not use SSE or views.
+CVE-2026-47890 exp:2026-12-31
