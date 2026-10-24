@@ -1,0 +1,14 @@
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.log
+.env
+*.env
+*.pem
+*.key
+kubeconfig*
+Dockerfile
+.dockerignore
