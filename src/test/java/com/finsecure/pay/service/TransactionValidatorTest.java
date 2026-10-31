@@ -16,16 +16,25 @@ import com.finsecure.pay.config.ValidationProperties;
 import com.finsecure.pay.model.TransactionRequest;
 import com.finsecure.pay.model.ValidationResult.Status;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 class TransactionValidatorTest {
 
     private static final String VALID_CARD = "4111111111111111";
 
+    private SimpleMeterRegistry meterRegistry;
     private TransactionValidator validator;
 
     @BeforeEach
     void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
         validator = new TransactionValidator(
-                new ValidationProperties(new BigDecimal("10000"), Set.of("SGD", "USD", "EUR")));
+                new ValidationProperties(new BigDecimal("10000"), Set.of("SGD", "USD", "EUR")),
+                meterRegistry);
+    }
+
+    private double validations(String status) {
+        return meterRegistry.get("finsecure.validations").tag("status", status).counter().count();
     }
 
     private static TransactionRequest txn(String id, String amount, String currency, String card, String merchant) {
@@ -153,6 +162,17 @@ class TransactionValidatorTest {
 
         assertThat(result.status()).isEqualTo(Status.REJECTED);
         assertThat(result.reasons()).hasSize(4);
+    }
+
+    @Test
+    @DisplayName("Approved and rejected validations are counted for monitoring")
+    void outcomesAreCounted() {
+        validator.validate(txn("T13", "100", "SGD", VALID_CARD, "M001"));
+        validator.validate(txn("T14", "-1", "SGD", VALID_CARD, "M001"));
+        validator.validate(txn("T15", "100", "JPY", VALID_CARD, "M001"));
+
+        assertThat(validations("APPROVED")).isEqualTo(1.0);
+        assertThat(validations("REJECTED")).isEqualTo(2.0);
     }
 
     @Test

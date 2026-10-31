@@ -1,7 +1,9 @@
 package com.finsecure.pay.controller;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -65,6 +67,18 @@ class ApiIntegrationTest {
     void prometheusEndpointIsExposed() throws Exception {
         mockMvc.perform(get("/actuator/prometheus"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void validationCounterIsExportedToPrometheus() throws Exception {
+        mockMvc.perform(post("/validate").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"transactionId\":\"API-3\",\"amount\":10,\"currency\":\"SGD\","
+                                + "\"cardNumber\":\"4111111111111111\",\"merchantId\":\"M001\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("finsecure_validations_total{")));
     }
 
     @Test

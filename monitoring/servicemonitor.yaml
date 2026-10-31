@@ -1,0 +1,19 @@
+# Tells Prometheus to scrape the app's /actuator/prometheus endpoint every 15s
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: finsecure-pay
+  namespace: finsecure
+  labels:
+    app: finsecure
+spec:
+  selector:
+    matchLabels:
+      app: finsecure
+  namespaceSelector:
+    matchNames:
+      - finsecure
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s

@@ -1,0 +1,23 @@
+# Fluent Bit ships FinSecure Pay container logs to CloudWatch Logs.
+# Install:
+#   helm upgrade --install fluent-bit eks/aws-for-fluent-bit \
+#     -n logging --create-namespace -f monitoring/fluent-bit-values.yaml
+# Node IAM permission comes from withAddonPolicies.cloudWatch in infra/eks-cluster.yaml.
+
+input:
+  # Only the app's namespace, to keep CloudWatch costs low
+  path: "/var/log/containers/*_finsecure_*.log"
+
+cloudWatchLogs:
+  enabled: true
+  region: ap-southeast-1
+  logGroupName: /eks/finsecure-eks/finsecure-pay
+  logStreamPrefix: "pod-"
+  autoCreateGroup: true
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

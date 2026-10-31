@@ -1,0 +1,82 @@
+# Grafana loads any ConfigMap labelled grafana_dashboard=1 as a dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finsecure-pay-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  finsecure-pay.json: |
+    {
+      "title": "FinSecure Pay - Service Health",
+      "uid": "finsecure-pay",
+      "tags": ["finsecure"],
+      "timezone": "browser",
+      "refresh": "10s",
+      "time": { "from": "now-30m", "to": "now" },
+      "schemaVersion": 39,
+      "panels": [
+        {
+          "type": "stat", "title": "Available pods",
+          "gridPos": { "x": 0, "y": 0, "w": 6, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{ "refId": "A", "expr": "kube_deployment_status_replicas_available{namespace=\"finsecure\", deployment=\"finsecure-pay\"}" }],
+          "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null }, { "color": "orange", "value": 1 }, { "color": "green", "value": 2 } ] } } },
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "type": "stat", "title": "Rejection rate (5m)",
+          "gridPos": { "x": 6, "y": 0, "w": 6, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{ "refId": "A", "expr": "sum(rate(finsecure_validations_total{namespace=\"finsecure\", status=\"REJECTED\"}[5m])) / sum(rate(finsecure_validations_total{namespace=\"finsecure\"}[5m]))" }],
+          "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null }, { "color": "orange", "value": 0.3 }, { "color": "red", "value": 0.5 } ] } } },
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+        {
+          "type": "timeseries", "title": "Validations per second by outcome",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{ "refId": "A", "expr": "sum by (status) (rate(finsecure_validations_total{namespace=\"finsecure\"}[1m]))", "legendFormat": "{{status}}" }],
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [
+            { "matcher": { "id": "byName", "options": "APPROVED" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+            { "matcher": { "id": "byName", "options": "REJECTED" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] } ] }
+        },
+        {
+          "type": "timeseries", "title": "HTTP requests per second by endpoint",
+          "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{ "refId": "A", "expr": "sum by (uri, status) (rate(http_server_requests_seconds_count{namespace=\"finsecure\", uri!~\"/actuator.*\"}[1m]))", "legendFormat": "{{uri}} {{status}}" }],
+          "fieldConfig": { "defaults": { "unit": "reqps" } }
+        },
+        {
+          "type": "timeseries", "title": "p95 response time by endpoint",
+          "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{namespace=\"finsecure\", uri!~\"/actuator.*\"}[2m])))", "legendFormat": "{{uri}}" }],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        },
+        {
+          "type": "timeseries", "title": "Pod CPU (cores)",
+          "gridPos": { "x": 0, "y": 14, "w": 8, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{ "refId": "A", "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"finsecure\", container=\"finsecure-pay\"}[2m]))", "legendFormat": "{{pod}}" }]
+        },
+        {
+          "type": "timeseries", "title": "Pod memory (working set)",
+          "gridPos": { "x": 8, "y": 14, "w": 8, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{ "refId": "A", "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"finsecure\", container=\"finsecure-pay\"})", "legendFormat": "{{pod}}" }],
+          "fieldConfig": { "defaults": { "unit": "bytes" } }
+        },
+        {
+          "type": "timeseries", "title": "Node CPU usage",
+          "gridPos": { "x": 16, "y": 14, "w": 8, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [{ "refId": "A", "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[2m]))", "legendFormat": "{{instance}}" }],
+          "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 } }
+        }
+      ]
+    }

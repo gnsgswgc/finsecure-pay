@@ -1,0 +1,51 @@
+# Alert rules for FinSecure Pay. Alerts labelled team=finsecure are emailed
+# by Alertmanager; other built-in cluster alerts are kept quiet.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: finsecure-pay-alerts
+  namespace: finsecure
+  labels:
+    app: finsecure
+spec:
+  groups:
+    - name: finsecure-pay
+      rules:
+        - alert: FinsecurePodsUnavailable
+          # Fewer than the 2 replicas needed for high availability
+          expr: kube_deployment_status_replicas_available{namespace="finsecure", deployment="finsecure-pay"} < 2
+          for: 1m
+          labels:
+            severity: critical
+            team: finsecure
+          annotations:
+            summary: "FinSecure Pay has fewer than 2 available pods"
+            description: "Only {{ $value }} pod(s) available for 1 minute. Check: kubectl -n finsecure get pods"
+
+        - alert: FinsecureHighRejectionRate
+          # More than half of transactions rejected (possible bad client or attack)
+          expr: |
+            sum(rate(finsecure_validations_total{namespace="finsecure", status="REJECTED"}[2m]))
+              / sum(rate(finsecure_validations_total{namespace="finsecure"}[2m])) > 0.5
+            and sum(rate(finsecure_validations_total{namespace="finsecure"}[2m])) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+            team: finsecure
+          annotations:
+            summary: "More than 50% of transactions are being rejected"
+            description: "Rejection rate is {{ $value | humanizePercentage }} over the last 2 minutes."
+
+        - alert: FinsecureHighLatency
+          # 95% of /validate requests should finish within 500 ms
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(http_server_requests_seconds_bucket{namespace="finsecure", uri="/validate"}[5m]))
+            ) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            team: finsecure
+          annotations:
+            summary: "FinSecure Pay /validate p95 latency above 500 ms"
+            description: "p95 latency is {{ $value | humanizeDuration }}."

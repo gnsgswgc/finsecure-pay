@@ -17,14 +17,18 @@ iam:
 
 managedNodeGroups:
   - name: workers
-    # t3.small is Free-plan eligible; 2 nodes give 2 replicas on separate nodes
+    # t3.small is Free-plan eligible. 3 nodes leave room for the monitoring
+    # stack (a t3.small holds at most 11 pods and has 2 GB of memory).
     instanceType: t3.small
-    desiredCapacity: 2
+    desiredCapacity: 3
     minSize: 2
-    maxSize: 3
+    maxSize: 4
     volumeSize: 20
     labels:
       role: workers
+    iam:
+      withAddonPolicies:
+        cloudWatch: true   # lets Fluent Bit write app logs to CloudWatch Logs
     tags:
       project: finsecure-pay
 

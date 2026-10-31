@@ -197,12 +197,36 @@ pipeline {
         }
     }
 
+    // Email recipients come from Jenkins > System > Extended E-mail Notification
+    // (Default Recipients), so no address is stored in Git
     post {
         success {
             echo "Deployed ${IMAGE}:${VERSION} to ${CLUSTER}"
+            emailext(
+                to: '$DEFAULT_RECIPIENTS',
+                subject: "SUCCESS: finsecure-pay ${VERSION} deployed (build #${BUILD_NUMBER})",
+                body: """FinSecure Pay ${VERSION} passed all quality and security gates and is live on ${CLUSTER}.
+
+Build: ${BUILD_URL}
+Commit: ${env.GIT_COMMIT}
+"""
+            )
         }
         failure {
             echo "Pipeline failed - nothing after the failed stage was run"
+            emailext(
+                to: '$DEFAULT_RECIPIENTS',
+                subject: "FAILED: finsecure-pay build #${BUILD_NUMBER} - release blocked",
+                attachLog: true,
+                body: """The FinSecure Pay pipeline failed, so nothing after the failed stage was deployed.
+
+Console log: ${BUILD_URL}console
+Security reports: ${BUILD_URL}artifact/reports/
+Commit: ${env.GIT_COMMIT}
+
+The full log is attached.
+"""
+            )
         }
         always {
             archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true

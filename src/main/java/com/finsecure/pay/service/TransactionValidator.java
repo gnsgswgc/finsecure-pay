@@ -14,6 +14,9 @@ import com.finsecure.pay.config.ValidationProperties;
 import com.finsecure.pay.model.TransactionRequest;
 import com.finsecure.pay.model.ValidationResult;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+
 /**
  * Applies the FinSecure Pay validation rules to a transaction.
  * Every failed rule adds a reason; no reasons means APPROVED.
@@ -29,8 +32,20 @@ public class TransactionValidator {
     // a shared store (e.g. Redis) would be needed across replicas.
     private final Set<String> approvedIds = ConcurrentHashMap.newKeySet();
 
-    public TransactionValidator(ValidationProperties properties) {
+    // Business metrics, exposed to Prometheus as finsecure_validations_total{status=...}
+    private final Counter approvedCounter;
+    private final Counter rejectedCounter;
+
+    public TransactionValidator(ValidationProperties properties, MeterRegistry meterRegistry) {
         this.properties = properties;
+        this.approvedCounter = Counter.builder("finsecure.validations")
+                .description("Transaction validations by outcome")
+                .tag("status", "APPROVED")
+                .register(meterRegistry);
+        this.rejectedCounter = Counter.builder("finsecure.validations")
+                .description("Transaction validations by outcome")
+                .tag("status", "REJECTED")
+                .register(meterRegistry);
     }
 
     public ValidationResult validate(TransactionRequest request) {
@@ -66,6 +81,9 @@ public class TransactionValidator {
         ValidationResult result = ValidationResult.of(txnId, reasons);
         if (result.status() == ValidationResult.Status.APPROVED) {
             approvedIds.add(txnId);
+            approvedCounter.increment();
+        } else {
+            rejectedCounter.increment();
         }
 
         log.info("validation txnId={} status={} card={} reasons={}",
