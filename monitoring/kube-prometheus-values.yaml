@@ -52,12 +52,13 @@ grafana:
       enabled: true
       label: grafana_dashboard
       searchNamespace: ALL
+  # Grafana 12 needs about 300 MB at idle; 300Mi was too tight and made it unresponsive
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      memory: 300Mi
+      memory: 600Mi
 
 prometheusOperator:
   resources:
